@@ -1,0 +1,121 @@
+# Default values for openebs-devicelocalpv.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+release:
+  version: "0.1.0"
+
+imagePullSecrets:
+# - name: "image-pull-secret"
+
+# enable storage capacity tracking feature
+# Ref: https://kubernetes:io/docs/concepts/storage/storage-capacity
+storageCapacity: true
+
+rbac:
+  # rbac.pspEnabled: `true` if PodSecurityPolicy resources should be created
+  pspEnabled: false
+
+# deviceNode contains the configurables for
+# the device node daemonset
+deviceNode:
+  componentName: openebs-device-node
+  driverRegistrar:
+    name: "csi-node-driver-registrar"
+    image:
+      # Make sure that registry name end with a '/'.
+      # For example : k8s.gcr.io/ is a correct value here and quay.io is incorrect
+      registry: k8s.gcr.io/
+      repository: sig-storage/csi-node-driver-registrar
+      pullPolicy: IfNotPresent
+      # Overrides the image tag whose default is the chart appVersion.
+      tag: v2.1.0
+  updateStrategy:
+    type: RollingUpdate
+  annotations: {}
+  podAnnotations: {}
+  # This can be configured to run on various different k8s ditributions like
+  # microk8s where kubelet dir is different
+  kubeletDir: "/var/lib/kubelet/"
+  resources: {}
+#    limits:
+#      cpu: 10m
+#      memory: 32Mi
+#    requests:
+#      cpu: 10m
+#      memory: 32Mi
+  ## Labels to be added to openebs-device node pods
+  podLabels:
+    name: openebs-device-node
+  nodeSelector: {}
+  tolerations: []
+  securityContext: {}
+  labels: {}
+
+# deviceController contains the configurables for
+# the device controller statefulset
+deviceController:
+  componentName: openebs-device-controller
+  replicas: 1
+  serviceName: openebs-device
+  provisioner:
+    name: "csi-provisioner"
+    image:
+      # Make sure that registry name end with a '/'.
+      # For example : k8s.gcr.io/ is a correct value here and quay.io is incorrect
+      registry: k8s.gcr.io/
+      repository: sig-storage/csi-provisioner
+      pullPolicy: IfNotPresent
+      # Overrides the image tag whose default is the chart appVersion.
+      tag: v2.1.0
+  updateStrategy:
+    type: RollingUpdate
+  annotations: {}
+  podAnnotations: {}
+  resources: {}
+#    limits:
+#      cpu: 10m
+#      memory: 32Mi
+#    requests:
+#      cpu: 10m
+#      memory: 32Mi
+  ## Labels to be added to openebs-device controller pods
+  podLabels:
+    name: openebs-device-controller
+  nodeSelector: {}
+  tolerations: []
+  securityContext: {}
+
+# devicePlugin is the common csi container used by the
+# controller statefulset and node daemonset
+devicePlugin:
+  name: "openebs-device-plugin"
+  image:
+    # Make sure that registry name end with a '/'.
+    # For example : k8s.gcr.io/ is a correct value here and quay.io is incorrect
+    registry:
+    repository: openebs/device-driver
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 0.1.0
+
+role: openebs-device
+
+crd:
+  enableInstall: true
+
+serviceAccount:
+  deviceController:
+    # Specifies whether a service account should be created
+    create: true
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: openebs-device-controller-sa
+  deviceNode:
+    # Specifies whether a service account should be created
+    create: true
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: openebs-device-node-sa
+
+analytics:
+  enabled: true

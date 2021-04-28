@@ -1,0 +1,129 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: {{ template "devicelocalpv.fullname" . }}-node
+  {{- with .Values.deviceNode.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "devicelocalpv.deviceNode.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "devicelocalpv.deviceNode.matchLabels" . | nindent 6 }}
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      {{- with .Values.deviceNode.podAnnotations }}
+      annotations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "devicelocalpv.deviceNode.labels" . | nindent 8 }}
+        {{- with .Values.deviceNode.podLabels}}
+        {{ toYaml . | nindent 8 }}
+        {{- end}}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccount: {{ .Values.serviceAccount.deviceNode.name }}
+      hostNetwork: true
+      containers:
+        - name: {{ .Values.deviceNode.driverRegistrar.name }}
+          image: "{{ .Values.deviceNode.driverRegistrar.image.registry }}{{ .Values.deviceNode.driverRegistrar.image.repository }}:{{ .Values.deviceNode.driverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.deviceNode.driverRegistrar.image.pullPolicy }}
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/device-localpv /registration/device-localpv-reg.sock"]
+          env:
+            - name: ADDRESS
+              value: /plugin/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: {{ .Values.deviceNode.kubeletDir }}plugins/device-localpv/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NODE_DRIVER
+              value: openebs-device
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /plugin
+            - name: registration-dir
+              mountPath: /registration
+          resources:
+            {{- toYaml .Values.deviceNode.resources | nindent 12 }}
+        - name: {{ .Values.devicePlugin.name }}
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          image: "{{ .Values.devicePlugin.image.registry }}{{ .Values.devicePlugin.image.repository }}:{{ .Values.devicePlugin.image.tag }}"
+          imagePullPolicy: {{ .Values.devicePlugin.image.pullPolicy }}
+          args:
+            - "--nodeid=$(OPENEBS_NODE_ID)"
+            - "--endpoint=$(OPENEBS_CSI_ENDPOINT)"
+            - "--plugin=$(OPENEBS_NODE_DRIVER)"
+          env:
+            - name: OPENEBS_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OPENEBS_CSI_ENDPOINT
+              value: unix:///plugin/csi.sock
+            - name: OPENEBS_NODE_DRIVER
+              value: agent
+            - name: DEVICE_DRIVER_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /plugin
+            - name: device-dir
+              mountPath: /dev
+            - name: pods-mount-dir
+              mountPath: {{ .Values.deviceNode.kubeletDir }}
+              # needed so that any mounts setup inside this container are
+              # propagated back to the host machine.
+              mountPropagation: "Bidirectional"
+          resources:
+            {{- toYaml .Values.deviceNode.resources | nindent 12 }}
+      volumes:
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: registration-dir
+          hostPath:
+            path: {{ .Values.deviceNode.kubeletDir }}plugins_registry/
+            type: DirectoryOrCreate
+        - name: plugin-dir
+          hostPath:
+            path: {{ .Values.deviceNode.kubeletDir }}plugins/device-localpv/
+            type: DirectoryOrCreate
+        - name: pods-mount-dir
+          hostPath:
+            path: {{ .Values.deviceNode.kubeletDir }}
+            type: Directory
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 2 }}
+{{- end }}
+{{- if .Values.deviceNode.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.deviceNode.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.deviceNode.securityContext }}
+      securityContext:
+{{ toYaml .Values.deviceNode.securityContext | indent 8 }}
+{{- end }}
+{{- if .Values.deviceNode.tolerations }}
+      tolerations:
+{{ toYaml .Values.deviceNode.tolerations | indent 8 }}
+{{- end }}

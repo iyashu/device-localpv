@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "devicelocalpv.fullname" . }}-controller
+  {{- with .Values.deviceController.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "devicelocalpv.deviceController.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "devicelocalpv.deviceController.matchLabels" . | nindent 6 }}
+  serviceName: "{{ .Values.deviceController.serviceName }}"
+  replicas: {{ .Values.deviceController.replicas }}
+  template:
+    metadata:
+      {{- with .Values.deviceController.podAnnotations }}
+      annotations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "devicelocalpv.deviceController.labels" . | nindent 8 }}
+        {{- with .Values.deviceController.podLabels}}
+        {{ toYaml . | nindent 8 }}
+        {{- end}}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - openebs-device-controller
+            topologyKey: "kubernetes.io/hostname"
+      priorityClassName: system-cluster-critical
+      serviceAccount: {{ .Values.serviceAccount.deviceController.name }}
+      containers:
+        - name: {{ .Values.deviceController.provisioner.name }}
+          image: "{{ .Values.deviceController.provisioner.image.registry }}{{ .Values.deviceController.provisioner.image.repository }}:{{ .Values.deviceController.provisioner.image.tag }}"
+          imagePullPolicy: {{ .Values.deviceController.provisioner.image.pullPolicy }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--v=5"
+            - "--feature-gates=Topology=true"
+            - "--strict-topology"
+            - "--leader-election"
+            - "--enable-capacity={{ .Values.storageCapacity }}"
+            - "--extra-create-metadata=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          resources:
+            {{- toYaml .Values.deviceController.resources | nindent 12 }}
+        - name: {{ .Values.devicePlugin.name }}
+          image: "{{ .Values.devicePlugin.image.registry }}{{ .Values.devicePlugin.image.repository }}:{{ .Values.devicePlugin.image.tag }}"
+          imagePullPolicy: {{ .Values.devicePlugin.image.pullPolicy }}
+          env:
+            - name: OPENEBS_CONTROLLER_DRIVER
+              value: controller
+            - name: OPENEBS_CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: DEVICE_DRIVER_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OPENEBS_IO_INSTALLER_TYPE
+              value: "device-localpv-helm"
+            - name: OPENEBS_IO_ENABLE_ANALYTICS
+              value: "{{ .Values.analytics.enabled }}"
+          args :
+            - "--endpoint=$(OPENEBS_CSI_ENDPOINT)"
+            - "--plugin=$(OPENEBS_CONTROLLER_DRIVER)"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          resources:
+            {{- toYaml .Values.deviceController.resources | nindent 12 }}
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 2 }}
+{{- end }}
+{{- if .Values.deviceController.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.deviceController.nodeSelector | indent 8 }}
+{{- end }}
+{{- if .Values.deviceController.securityContext }}
+      securityContext:
+{{ toYaml .Values.deviceController.securityContext | indent 8 }}
+{{- end }}
+{{- if .Values.deviceController.tolerations }}
+      tolerations:
+{{ toYaml .Values.deviceController.tolerations | indent 8 }}
+{{- end }}
