@@ -67,6 +67,8 @@ deviceController:
       pullPolicy: IfNotPresent
       # Overrides the image tag whose default is the chart appVersion.
       tag: v2.1.0
+    metricsPort: 9601
+
   updateStrategy:
     type: RollingUpdate
   annotations: {}
@@ -97,6 +99,7 @@ devicePlugin:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: 0.1.0
+#  metricsPort: 9600
 
 role: openebs-device
 

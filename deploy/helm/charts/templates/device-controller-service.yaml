@@ -1,0 +1,18 @@
+{{- if .Values.deviceController.provisioner.metricsPort }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "devicelocalpv.fullname" . }}-controller-service
+  labels:
+    {{- include "devicelocalpv.deviceController.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: {{ .Values.deviceController.provisioner.metricsPort }}
+      targetPort: {{ .Values.deviceController.provisioner.metricsPort }}
+  selector:
+    {{- with .Values.deviceController.podLabels }}
+      {{ toYaml . }}
+    {{- end }}
+{{- end }}

@@ -48,6 +48,9 @@ spec:
             - "--leader-election"
             - "--enable-capacity={{ .Values.storageCapacity }}"
             - "--extra-create-metadata=true"
+            {{- if .Values.deviceController.provisioner.metricsPort }}
+            - "--http-endpoint=:{{ .Values.deviceController.provisioner.metricsPort }}"
+            {{- end }}
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock

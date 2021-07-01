@@ -1,0 +1,46 @@
+---
+deviceNode:
+  driverRegistrar:
+    image:
+      registry: container-registry.alm.fkcloud.in/alm/k8s.gcr.io/
+      repository: sig-storage/csi-node-driver-registrar
+      pullPolicy: IfNotPresent
+      tag: v2.2.0
+  resources:
+    limits:
+      cpu: 20m
+      memory: 100Mi
+    requests:
+      cpu: 20m
+      memory: 100Mi
+  tolerations:
+    - operator: Exists
+
+deviceController:
+  provisioner:
+    image:
+      registry: container-registry.alm.fkcloud.in/alm/k8s.gcr.io/
+      repository: sig-storage/csi-provisioner
+      pullPolicy: IfNotPresent
+      tag: v2.1.2
+
+  securityContext:
+    runAsUser: 1000
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+devicePlugin:
+  image:
+    registry: container-registry.alm.fkcloud.in/alm/
+    repository: openebs/device-driver
+    pullPolicy: IfNotPresent
+    tag: 0.3.0
+
+analytics:
+  enabled: false
